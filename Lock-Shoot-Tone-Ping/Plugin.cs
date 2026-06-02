@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 namespace Lock_Shoot_Tone_Ping;
 
 
-[BepInPlugin("com.Aeriicatmeow"," Lock Shoot Tone Ping", "1.0.0")]
+[BepInPlugin("com.Aeriicatmeow.LockToneShootPing"," Lock Shoot Tone Ping", "1.0.0")]
 public class Plugin : BaseUnityPlugin
 {
     public static Plugin I { get; private set; }
