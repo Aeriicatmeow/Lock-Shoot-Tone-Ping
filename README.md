@@ -8,10 +8,10 @@ Bombs dont have pitch scaling with distance because the time window to fire the 
 
 Copy Dll into Bepinex plugins folder.
 Run the game, this will generate the required file structure for the mod. The file should also be automatically moved into its own folder under the same name:
-Plugins
-¬LockShootTonePing
-  ¬LockShootTonePing.Dll
-  ¬Audio
+  Plugins
+    ¬LockShootTonePing
+      ¬LockShootTonePing.Dll
+      ¬Audio
 You then want to transfer all of your audio files into the audio folder.
 Please do note that audio files do not need to adhere to specific names to function
 After this, open up the game and open the bepinex Config menu (F1 by default)
@@ -24,17 +24,26 @@ Please note that leaving a field in an audio set unassigned will result in no au
 I think this mod is fairly resilient and bug proof. If you run into any issues, please dont hesitate to contact me although please do provide as much detail as possible as to how I can recreate the bug in question.
 
 
-  Example of a setup for a weapon.
+Example of a setup for a weapon.
   "Set 0"
     ¬NEZ: Aim9x shoot High Pitched Sound File Name
     ¬SHOOT: Aim9x shoot normal Sound File Name
     ¬LOCKING: Aim9x Growl Sound File Name
     ¬Scale Pitch With Distance = true
-
+  
   "IR Missile"
     ¬Set 0
     ¬Enabled = true
-  
-  Please note that the above is just an example, please feel free to mess around with the settings as you wish.
 
-    
+Please note that the above is just an example, please feel free to mess around with the settings as you wish.
+
+
+The Weapon Classes covered specifically are:
+IR Missiles.
+ARHs/SARHs/ARADs
+Optical Missiles/Glide Bombs
+Laser Guided
+Gravity Bombs
+Guns
+Jamming Pods
+The Medusa Deadly Laser
