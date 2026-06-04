@@ -44,6 +44,7 @@ public class Plugin : BaseUnityPlugin
     private ConfigEntry<bool> CFG_Enabled;
     private ConfigEntry<bool> CFG_PlayWhenNoTargetSelect;
     private ConfigEntry<bool> CFG_PlayWhenNoAmmo;
+    private ConfigEntry<bool> CFG_PlayWhenGearDown;
     private ConfigEntry<bool> CFG_prioritizeNEZSound;
 
     //Sound classification by weapon type
@@ -191,6 +192,7 @@ public class Plugin : BaseUnityPlugin
         CFG_Enabled = Config.Bind("General", "ModEnabled", true, "Do you want to enable this mod?");
         CFG_PlayWhenNoTargetSelect = Config.Bind("General", "PlayWhenNoTargts", false, "Do you want the no lock sound to be played when you have no target selected?");
         CFG_PlayWhenNoAmmo = Config.Bind("General", "PlayWhenNoTargts", false, "Do you want Sound to be played even if you have no Ammo");
+        CFG_PlayWhenGearDown = Config.Bind("General", "PlayWhenGearDown", false, "If Enabled, Lock tones continue to play when your landing gear is extended");
         CFG_prioritizeNEZSound = Config.Bind("General", "PrioritizeNEZ", false, "If ticked, if a missile does not have a NEZ defined, the NEZ sound will play to shoot instead of the shoot sound");
     }
     private void EstablishWeaponSpecificCFG()
@@ -331,7 +333,7 @@ public class Plugin : BaseUnityPlugin
                     }
                 }
             }
-            if (CheckIfReloadIsNeeded(CFG_NoAmmoSound, Aud_NoAmmo)) ;
+            if (CheckIfReloadIsNeeded(CFG_NoAmmoSound, Aud_NoAmmo))
             {
                 Logger.LogDebug("Mismatch for Audio (NoAmmo). Updating");
                 Aud_NoAmmo = Audio.SimpleSearchForAudio(CFG_NoAmmoSound.Value);
@@ -383,14 +385,14 @@ public class Plugin : BaseUnityPlugin
             return false;
         }
     }
-    public void ResolveLockAudio(bool ClearToShoot, float NEZ, float TargetDistance, float MaxRange, float MinRange,bool TargetsSelected, bool SufficientAmmo, WeaponStation WeaponStation)
+    public void ResolveLockAudio(bool ClearToShoot, float NEZ, float TargetDistance, float MaxRange, float MinRange,bool TargetsSelected, bool SufficientAmmo, bool GearDown, WeaponStation WeaponStation)
     {
         if (CFG_Enabled.Value)
         {
             //Logger.LogInfo("Resolving through method 1");
             //Logger.LogInfo("Harmony Patch Recieved | CTS: " + ClearToShoot + " | NEZ: " + NEZ + " | TD: " + TargetDistance);
             int SetToPlayFrom = -1;
-            if ((TargetsSelected || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom))
+            if ((TargetsSelected || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom) & (!GearDown || CFG_PlayWhenGearDown.Value))
             {
                 TicksSinceJustifiedExistence = 0;
                 if (ClearToShoot)
@@ -430,13 +432,13 @@ public class Plugin : BaseUnityPlugin
             ResolveAudioLockPost(SufficientAmmo, WeaponStation);
         }
     }
-    public void ResolveLockAudio(bool ClearToShoot, float TargetDistance, float MaxRange, float MinRange,bool TargetsSelected, bool SufficientAmmo, WeaponStation WeaponStation, bool DisableDistanceScale = false)
+    public void ResolveLockAudio(bool ClearToShoot, float TargetDistance, float MaxRange, float MinRange,bool TargetsSelected, bool SufficientAmmo, bool GearDown, WeaponStation WeaponStation, bool DisableDistanceScale = false)
     {
         if (CFG_Enabled.Value)
         {
             int SetToPlayFrom = -1;
             //Logger.LogInfo("Resolving through method 2");
-            if ((TargetsSelected || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom))
+            if ((TargetsSelected || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom) & (!GearDown || CFG_PlayWhenGearDown.Value))
             {
                 TicksSinceJustifiedExistence = 0;
                 if (ClearToShoot)
