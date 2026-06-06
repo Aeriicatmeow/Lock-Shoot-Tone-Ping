@@ -62,4 +62,5 @@ Please note that the above is just an example, please feel free to mess around w
 - The Medusa Deadly Laser
 
 
-IMPORTANT: Mod Requires Bepinex Configuration Manager or equivalent to function.
+IMPORTANT: Mod Requires Bepinex Configuration Manager or equivalent to assign audio files to weapons.
+I recomend that you install that otherwise changing the configs manually might be difficult
