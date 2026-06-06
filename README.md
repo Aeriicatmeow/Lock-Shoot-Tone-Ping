@@ -60,3 +60,6 @@ Please note that the above is just an example, please feel free to mess around w
 - Guns
 - Jamming Pods
 - The Medusa Deadly Laser
+
+
+IMPORTANT: Mod Requires Bepinex Configuration Manager or equivalent to function.
