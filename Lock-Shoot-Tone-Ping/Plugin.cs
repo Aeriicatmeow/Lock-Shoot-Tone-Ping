@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 namespace Lock_Shoot_Tone_Ping;
 
 
-[BepInPlugin("com.Aeriicatmeow.LockToneShootPing"," Lock Shoot Tone Ping", "1.0.0")]
+[BepInPlugin("com.Aeriicatmeow.LockToneShootPing"," Lock Shoot Tone Ping", "1.1.0")]
 public class Plugin : BaseUnityPlugin
 {
     public static Plugin I { get; private set; }
@@ -40,6 +40,7 @@ public class Plugin : BaseUnityPlugin
     private ConfigEntry<string>[] CFG_SHOOT_Sound;
     private ConfigEntry<string>[] CFG_LOCKING_Sound;
     private ConfigEntry<bool>[] CFG_UsingPitchDistanceScaling;
+    private ConfigEntry<bool>[] CFG_PlayOnceOnStatusChanged;
 
     private ConfigEntry<bool> CFG_Enabled;
     private ConfigEntry<bool> CFG_PlayWhenNoTargetSelect;
@@ -77,6 +78,8 @@ public class Plugin : BaseUnityPlugin
     private ConfigEntry<bool> CFG_NoAmmoSwitchEnabled;
     private bool HasAmmo;
     private string CurrentWeaponStationName;
+    private char CurrentState; //L = Locking, S = Shoot, N = Nez
+    private int PrevtargetNumber;
 
     private ConfigEntry<float> CFG_ScalePitchEnd;
 
@@ -170,6 +173,7 @@ public class Plugin : BaseUnityPlugin
             SetupAlarmCFG(ref CFG_SHOOT_Sound[i], "it is viable to shoot", "2) ShootSound", "Set " + i, AudioNames);
             SetupAlarmCFG(ref CFG_LOCKING_Sound[i], "it is not advisable to shoot", "3) LockingSound", "Set " + i, AudioNames);
             CFG_UsingPitchDistanceScaling[i] = Config.Bind("Set " + i + " Sounds", "4) Enable Distance Pitch Scaling", false, "If Enabled, the NEZ sound will be replaced by the Shoot Sound of variable pitch. The pitch depends on the relevant config in the Misc Section");
+            CFG_PlayOnceOnStatusChanged[i] = Config.Bind("Set " + i + " Sounds", "5) PlayAudioOnceWhenLockStatusChanged", false, "If Enabled, Selected audio will play once when the status of the lock has changed (e.g. from Shoot to NEZ). If disabled then audio will play continuously. Please note that this is not compatible with pitch scaling for obvious reasons");
         }
 
     }
@@ -184,6 +188,7 @@ public class Plugin : BaseUnityPlugin
         CFG_SHOOT_Sound = new ConfigEntry<string>[AudioClipNumber];
         CFG_LOCKING_Sound = new ConfigEntry<string>[AudioClipNumber];
         CFG_UsingPitchDistanceScaling = new ConfigEntry<bool>[AudioClipNumber];
+        CFG_PlayOnceOnStatusChanged = new ConfigEntry<bool>[AudioClipNumber];
     }
     private void EstablishGeneralCFG()
     {
@@ -385,14 +390,14 @@ public class Plugin : BaseUnityPlugin
             return false;
         }
     }
-    public void ResolveLockAudio(bool ClearToShoot, float NEZ, float TargetDistance, float MaxRange, float MinRange,bool TargetsSelected, bool SufficientAmmo, bool GearDown, WeaponStation WeaponStation)
+    public void ResolveLockAudio(bool ClearToShoot, float NEZ, float TargetDistance, float MaxRange, float MinRange,int TargetNumber, bool SufficientAmmo, bool GearDown, WeaponStation WeaponStation)
     {
         if (CFG_Enabled.Value)
         {
             //Logger.LogInfo("Resolving through method 1");
             //Logger.LogInfo("Harmony Patch Recieved | CTS: " + ClearToShoot + " | NEZ: " + NEZ + " | TD: " + TargetDistance);
             int SetToPlayFrom = -1;
-            if ((TargetsSelected || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom) & (!GearDown || CFG_PlayWhenGearDown.Value))
+            if ((TargetNumber > 0 || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom) & (!GearDown || CFG_PlayWhenGearDown.Value))
             {
                 TicksSinceJustifiedExistence = 0;
                 if (ClearToShoot)
@@ -402,27 +407,31 @@ public class Plugin : BaseUnityPlugin
                     {
                         if (CFG_UsingPitchDistanceScaling[SetToPlayFrom].Value)
                         {
-
-                            Audio.PlayAudio(Aud_SHOOT[SetToPlayFrom], false, ResolveAudioPitchFromDistance(TargetDistance, NEZ, MinRange));
+                            //Audio.ResetPitch();
+                            //Audio.SetPitch(ResolveAudioPitchFromDistance(TargetDistance, NEZ, MinRange));
+                            InternalRequestToPlayLockStateAudio(Aud_SHOOT[SetToPlayFrom], 'N', SetToPlayFrom, WeaponStation, TargetNumber,ResolveAudioPitchFromDistance(TargetDistance, NEZ, MinRange));
                         }
                         else
                         {
                             //Logger.LogInfo("PLAY NEZ");
-                            Audio.PlayAudio(Aud_NEZ[SetToPlayFrom]);
+                            //Audio.ResetPitch();
+                            InternalRequestToPlayLockStateAudio(Aud_NEZ[SetToPlayFrom], 'N', SetToPlayFrom, WeaponStation, TargetNumber);
                         }
-
+                        
                     }
                     else
                     {
                         //Logger.LogInfo("PLAY SHOOT");
-                        Audio.PlayAudio(Aud_SHOOT[SetToPlayFrom]);
+                        InternalRequestToPlayLockStateAudio(Aud_SHOOT[SetToPlayFrom], 'S', SetToPlayFrom, WeaponStation, TargetNumber);
+                        CurrentState = 'S';
                     }
 
                 }
                 else
                 {
                     //Logger.LogInfo("PLAY LOCK");
-                    Audio.PlayAudio(Aud_LOCKING[SetToPlayFrom]);
+                    InternalRequestToPlayLockStateAudio(Aud_LOCKING[SetToPlayFrom], 'L', SetToPlayFrom, WeaponStation, TargetNumber);
+                    CurrentState = 'L';
                 }
             }
             else
@@ -431,20 +440,22 @@ public class Plugin : BaseUnityPlugin
             }
             ResolveAudioLockPost(SufficientAmmo, WeaponStation);
         }
+        PrevtargetNumber = TargetNumber;
     }
-    public void ResolveLockAudio(bool ClearToShoot, float TargetDistance, float MaxRange, float MinRange,bool TargetsSelected, bool SufficientAmmo, bool GearDown, WeaponStation WeaponStation, bool DisableDistanceScale = false)
+    public void ResolveLockAudio(bool ClearToShoot, float TargetDistance, float MaxRange, float MinRange,int TargetNumber, bool SufficientAmmo, bool GearDown, WeaponStation WeaponStation, bool DisableDistanceScale = false)
     {
         if (CFG_Enabled.Value)
         {
             int SetToPlayFrom = -1;
             //Logger.LogInfo("Resolving through method 2");
-            if ((TargetsSelected || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom) & (!GearDown || CFG_PlayWhenGearDown.Value))
+            if ((TargetNumber > 0 || CFG_PlayWhenNoTargetSelect.Value) & (SufficientAmmo || CFG_PlayWhenNoAmmo.Value) & CheckIfWeaponTypeEnabled(WeaponStation, ref SetToPlayFrom) & (!GearDown || CFG_PlayWhenGearDown.Value))
             {
                 TicksSinceJustifiedExistence = 0;
                 if (ClearToShoot)
                 {
                     if (CFG_UsingPitchDistanceScaling[SetToPlayFrom].Value & !DisableDistanceScale)
                     {
+                        Audio.ResetPitch();
                         Audio.SetPitch(ResolveAudioPitchFromDistance(TargetDistance, MaxRange, MinRange));
                     }
                     else
@@ -454,19 +465,22 @@ public class Plugin : BaseUnityPlugin
                     if (CFG_prioritizeNEZSound.Value)
                     {
                         //Logger.LogInfo("PLAY NEZ");
-                        Audio.PlayAudio(Aud_NEZ[SetToPlayFrom]);
+                        InternalRequestToPlayLockStateAudio(Aud_NEZ[SetToPlayFrom], 'S', SetToPlayFrom, WeaponStation, TargetNumber);
+                        
                     }
                     else
                     {
                         //Logger.LogInfo("PLAY SHOOT");
-                        Audio.PlayAudio(Aud_SHOOT[SetToPlayFrom]);
+                        InternalRequestToPlayLockStateAudio(Aud_SHOOT[SetToPlayFrom], 'S', SetToPlayFrom, WeaponStation, TargetNumber);
+                        
                     }
 
                 }
                 else
                 {
                     //Logger.LogInfo("PLAY LOCK");
-                    Audio.PlayAudio(Aud_LOCKING[SetToPlayFrom]);
+                    InternalRequestToPlayLockStateAudio(Aud_LOCKING[SetToPlayFrom], 'L', SetToPlayFrom, WeaponStation, TargetNumber);
+                    
                 }
             }
             else
@@ -475,6 +489,21 @@ public class Plugin : BaseUnityPlugin
             }
             ResolveAudioLockPost(SufficientAmmo, WeaponStation);
         }
+        PrevtargetNumber = TargetNumber;
+        
+    }
+
+    private void InternalRequestToPlayLockStateAudio(AudioClip SourceAudio, char Code, int Set, WeaponStation WeaponStation, int CurrentTargetCount,float pitch = 1)//only on the calls for lock state audio. not for anything else
+    {
+        if(
+            ((Code != CurrentState || WeaponStation.WeaponInfo.weaponName !=  CurrentWeaponStationName || PrevtargetNumber != CurrentTargetCount) & CFG_PlayOnceOnStatusChanged[Set].Value) 
+            
+            || !CFG_PlayOnceOnStatusChanged[Set].Value)
+        {
+            Audio.PlayAudio(SourceAudio, CFG_PlayOnceOnStatusChanged[Set].Value, pitch);
+        }
+        CurrentState = Code;
+        
         
     }
     private float ResolveAudioPitchFromDistance(float TargetDistance, float MaxRange, float MinRange)
@@ -642,6 +671,11 @@ public class Plugin : BaseUnityPlugin
     public void StopAudio()
     {
         Audio.Stop();
+    }
+    public void StopAudioAndRatchetUpJustification()
+    {
+        StopAudio();
+        TicksSinceJustifiedExistence = int.MaxValue / 2;
     }
     private void OnDestroy()
     {

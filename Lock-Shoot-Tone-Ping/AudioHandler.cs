@@ -46,6 +46,10 @@ namespace Lock_Shoot_Tone_Ping
         {
             Source.pitch = 1;
         }
+        public void AmendNoExceptionClause(bool NewValue)
+        {
+            SeeCompleteNoExceptions = NewValue;
+        }
         public void Stop()
         {
             if (SeeCompleteNoExceptions & Source.isPlaying)
@@ -73,7 +77,10 @@ namespace Lock_Shoot_Tone_Ping
             //{
             //    Plugin.I.Log(LogLevel.Info, "Source is currently null");
             //}
-            SetPitch(Pitch);
+            if (Pitch != float.NaN)
+            {
+                SetPitch(Pitch);
+            }
             if (SeeCompleteNoExceptions & Source.isPlaying)
             {
                 return;
@@ -81,7 +88,7 @@ namespace Lock_Shoot_Tone_Ping
             SeeCompleteNoExceptions = SeeComplete;
             Source.volume = Mathf.Min(Mathf.Clamp(Volume_Percent.Value / 100f, 0f, 2f), 2f);//Yes, this is just ripped from yappinator but a bird told me that unty api stuff is faster cos its all in c++
 
-            if (Audio == Source.clip)
+            if (Audio == Source.clip & Source.isPlaying)
             {
                 //Plugin.I.Log(LogLevel.Info, "Chose not to play audio. already playing");
             }
