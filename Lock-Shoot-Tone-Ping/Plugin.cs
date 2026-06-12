@@ -94,8 +94,10 @@ public class Plugin : BaseUnityPlugin
     //private ConfigEntry<int> CFG_AudioClipNumber;
     private const int AudioClipNumber = 10;
 
-        
+
     //Hey, note to future me. if things start breaking, switch the reference for nuclear option from the game folder to a local one.
+
+    #region Mod Setup
     private void Awake()
     {
 
@@ -104,7 +106,7 @@ public class Plugin : BaseUnityPlugin
         Logger = base.Logger;
 
         int[] AudioSetLimit = new int[10];
-        for(int i = 0; i < AudioSetLimit.Length; i++)
+        for (int i = 0; i < AudioSetLimit.Length; i++)
         {
             AudioSetLimit[i] = i + 1;
         }
@@ -117,10 +119,10 @@ public class Plugin : BaseUnityPlugin
         EstablishWeaponSpecificCFG();
 
         //Locating of the DLL and creation of the audio directory/filestructure.
-        
+
 
         string Root = Path.GetDirectoryName(Info.Location);
-        IsSetupCorrectly = VerifyFileStructure(Root, Info.Location);
+        IsSetupCorrectly = VerifyCriticalFileStructure(Root, Info.Location);
 
 
 
@@ -129,7 +131,7 @@ public class Plugin : BaseUnityPlugin
         //Target Aquired, Advisable to shoot. Not Ideal (more of the thing for MMRs and so on as you want to shoot them at short range but you can, if you choose to, shoot them at long range)
         //Target Aquired, Shooting is advisable. Conditions are nominal.
 
-        Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root+"\\Audio");
+        Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
 
 
         EstablishAudioSetsCFG();
@@ -145,7 +147,7 @@ public class Plugin : BaseUnityPlugin
         TicksSinceJustifiedExistence = 0;
 
         Logger.LogInfo($"Plugin {FileModName} is loaded!");
-        
+
     }
     private void EstablishAudioSetsCFG()
     {
@@ -254,33 +256,18 @@ public class Plugin : BaseUnityPlugin
     //        EstablishAudioSetsCFG();
     //    }
     //}
-    private void Update()
-    {
-        
-        LoadAudioClipsIntoMemory();
-        TicksSinceJustifiedExistence++;
-        //Logger.LogInfo("Ticks Since Justified: " + TicksSinceJustifiedExistence);
-        if (TicksSinceJustifiedExistence > 3)
-        {
-            StopAudio();
-        }
-    }
-    private void OnActiveSceneChanged(Scene oldScene, Scene newScene)
-    {
-        Audio.Stop();
-        //LoadAudioClipsIntoMemory(true);
-    }
-    private void SetupAlarmCFG(ref ConfigEntry<string> M_Config, string Hint, string Key, string category,string[] AudioNames)
+    private void SetupAlarmCFG(ref ConfigEntry<string> M_Config, string Hint, string Key, string category, string[] AudioNames)
     {
         if (AudioNames.Length > 0)
         {
-            M_Config = Config.Bind(category+" Sounds", Key, AudioNames[0], new ConfigDescription($"What Audio Tones do you want to use when using {Hint}?", new AcceptableValueList<string>(AudioNames)));
+            M_Config = Config.Bind(category + " Sounds", Key, AudioNames[0], new ConfigDescription($"What Audio Tones do you want to use when using {Hint}?", new AcceptableValueList<string>(AudioNames)));
         }
         else
         {
-            M_Config = Config.Bind(category+" Sounds", Key, "", "What Audio Tones do you want to use? (None found Yet)");
+            M_Config = Config.Bind(category + " Sounds", Key, "", "What Audio Tones do you want to use? (None found Yet)");
         }
     }
+    #region AudioHandlingInThisScript
     private void LoadAudioClipsIntoMemory(bool OnStartUp = false)
     {
         //Logger.LogInfo("Request to reload audio files received. NEZ: "+ CFG_NEZ_Sound.Value + " SHOOT "+CFG_SHOOT_Sound.Value + " LOCK: "+CFG_LOCKING_Sound.Value);
@@ -313,7 +300,7 @@ public class Plugin : BaseUnityPlugin
                         Aud_NEZ[i] = null;
                     }
                 }
-                if (CheckIfReloadIsNeeded(CFG_SHOOT_Sound[i] ,Aud_SHOOT[i]))
+                if (CheckIfReloadIsNeeded(CFG_SHOOT_Sound[i], Aud_SHOOT[i]))
                 {
                     if (CFG_SHOOT_Sound[i].Value != AudioHandler.NoAudio)
                     {
@@ -348,7 +335,7 @@ public class Plugin : BaseUnityPlugin
     }
     private bool CheckIfReloadIsNeeded(ConfigEntry<string> CFG, AudioClip AC)
     {
-        if(AC == null & CFG.Value != AudioHandler.NoAudio)
+        if (AC == null & CFG.Value != AudioHandler.NoAudio)
         {
             return true;
         }
@@ -363,6 +350,85 @@ public class Plugin : BaseUnityPlugin
             }
         }
         return false;
+    }
+    #endregion
+    #region FileHandling
+    private static bool VerifyCriticalFileStructure(string Root, string CurrentDLLPath)
+    {
+        Regex LastInPath = new Regex(@"^.*[\\]([^\\]*$)");
+
+
+        if (LastInPath.Match(Root).Groups[1].Value != FileModName)
+        {
+            Logger.LogError($"Correct file structure missing. Specifically the {FileModName} Mod Folder.");
+            if (Directory.Exists($"{Root}\\{FileModName}"))
+            {
+                Logger.LogWarning("Mod folder does exist. Please move DLL file to this folder for mod to work.");
+            }
+            else
+            {
+                Logger.LogError("Mod Folder Not Found. Generating New one");
+                Directory.CreateDirectory($"{Root}\\{FileModName}\\Audio");
+            }
+            Logger.LogInfo("Restart of Nuclear Option is required to ensure the mod works properly");
+            try
+            {
+                File.Copy(CurrentDLLPath, $"{Root}\\{FileModName}\\Lock_Shoot_Tone_Ping.dll");
+                Logger.LogInfo(CurrentDLLPath + " -> " + $"{Root}\\{FileModName}\\Lock_Shoot_Tone_Ping.dll");
+            }
+            catch
+            {
+                Logger.LogError("Could not copy dll");
+            }
+        }
+        else
+        {
+            if (Directory.Exists($"{Root}\\Audio"))
+            {
+                Logger.LogMessage("File Structure Verifed");
+
+            }
+            else
+            {
+                Logger.LogWarning("Audio Folder Not Found. Generating New one");
+                Directory.CreateDirectory($"{Root}\\Audio");
+                Logger.LogMessage("File Structure has been corrected. Should be functional now.");
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private static void VerifyNonCriticalFileStructure(string Root)
+    {
+        //to be ran after the critical file structure script
+        if (!Directory.Exists($"{Root}\\{FileModName}\\Packs"))
+        {
+            Logger.LogWarning("External Packs Folder does not exist. Generating replacement");
+            Directory.CreateDirectory($"{Root}\\{FileModName}\\Packs");
+        }
+
+    }
+    #endregion
+    #endregion
+
+
+    #region LockAudioLogic
+    private void Update()
+    {
+
+        LoadAudioClipsIntoMemory();
+        TicksSinceJustifiedExistence++;
+        //Logger.LogInfo("Ticks Since Justified: " + TicksSinceJustifiedExistence);
+        if (TicksSinceJustifiedExistence > 3)
+        {
+            StopAudio();
+        }
+    }
+    private void OnActiveSceneChanged(Scene oldScene, Scene newScene)
+    {
+        Audio.Stop();
+        //LoadAudioClipsIntoMemory(true);
     }
     private bool ResolveIfNEZSound(float NEZ, float TargetDistance)
     {
@@ -616,58 +682,10 @@ public class Plugin : BaseUnityPlugin
         
     }
 
-    public void Log(LogLevel LogLevel, object Data)
-    {
-        Logger.Log(LogLevel, Data);
-    }
 
+    #endregion
 
-    private static bool VerifyFileStructure(string Root, string CurrentDLLPath)
-    {
-        Regex LastInPath = new Regex(@"^.*[\\]([^\\]*$)");
-
-
-        if (LastInPath.Match(Root).Groups[1].Value != FileModName)
-        {
-            Logger.LogError($"Correct file structure missing. Specifically the {FileModName} Mod Folder.");
-            if (Directory.Exists($"{Root}\\{FileModName}"))
-            {
-                Logger.LogWarning("Mod folder does exist. Please move DLL file to this folder for mod to work.");
-            }
-            else
-            {
-                Logger.LogError("Mod Folder Not Found. Generating New one");
-                Directory.CreateDirectory($"{Root}\\{FileModName}\\Audio");
-            }
-            Logger.LogInfo("Restart of Nuclear Option is required to ensure the mod works properly");
-            try
-            {
-                File.Copy(CurrentDLLPath, $"{Root}\\{FileModName}\\Lock_Shoot_Tone_Ping.dll");
-                Logger.LogInfo(CurrentDLLPath + " -> " + $"{Root}\\{FileModName}\\Lock_Shoot_Tone_Ping.dll");
-            }
-            catch
-            {
-                Logger.LogError("Could not copy dll");
-            }
-        }
-        else
-        {
-            if (Directory.Exists($"{Root}\\Audio"))
-            {
-                Logger.LogMessage("File Structure Verifed");
-                
-            }
-            else
-            {
-                Logger.LogWarning("Audio Folder Not Found. Generating New one");
-                Directory.CreateDirectory($"{Root}\\Audio");
-                Logger.LogMessage("File Structure has been corrected. Should be functional now.");
-            }
-            return true;
-        }
-        return false;
-    }
-    
+    #region misc
     public void StopAudio()
     {
         Audio.Stop();
@@ -684,7 +702,11 @@ public class Plugin : BaseUnityPlugin
             File.Delete(Info.Location);
         }
     }
-    
-   
+    public void Log(LogLevel LogLevel, object Data)
+    {
+        Logger.Log(LogLevel, Data);
+    }
+    public string GetFileModName() => FileModName;
+    #endregion
 }
 

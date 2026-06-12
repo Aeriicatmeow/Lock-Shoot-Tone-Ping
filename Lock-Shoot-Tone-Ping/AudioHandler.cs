@@ -14,10 +14,9 @@ using System.Diagnostics.Tracing;
 
 namespace Lock_Shoot_Tone_Ping
 {
+
     internal class AudioHandler
     {
-
-        #region AudioPlaying
         private AudioSource Source;
         private ConfigEntry<int> Volume_Percent;
         private AudioClip[] AllAudio;
@@ -38,6 +37,9 @@ namespace Lock_Shoot_Tone_Ping
             SeeCompleteNoExceptions = false;
             //DefaultPitch = Source.pitch;
         }
+
+        #region AudioPlaying
+
         public void SetPitch(float Pitch)
         {
             Source.pitch = Pitch;
