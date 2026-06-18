@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -9,6 +10,7 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using NuclearOption.DedicatedServer.Commands;
+using NuclearOption.Networking;
 using Unity.Audio;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -17,7 +19,7 @@ using UnityEngine.SceneManagement;
 namespace Lock_Shoot_Tone_Ping;
 
 
-[BepInPlugin("com.Aeriicatmeow.LockToneShootPing"," Lock Shoot Tone Ping", "1.1.0")]
+[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.1.0")]
 public class Plugin : BaseUnityPlugin
 {
     public static Plugin I { get; private set; }
@@ -42,6 +44,7 @@ public class Plugin : BaseUnityPlugin
     private ConfigEntry<bool>[] CFG_UsingPitchDistanceScaling;
     private ConfigEntry<bool>[] CFG_PlayOnceOnStatusChanged;
 
+    //General
     private ConfigEntry<bool> CFG_Enabled;
     private ConfigEntry<bool> CFG_PlayWhenNoTargetSelect;
     private ConfigEntry<bool> CFG_PlayWhenNoAmmo;
@@ -94,7 +97,15 @@ public class Plugin : BaseUnityPlugin
     //private ConfigEntry<int> CFG_AudioClipNumber;
     private const int AudioClipNumber = 10;
 
+    //PACK HELL Stuff
 
+    private Dictionary<string, ConfigEntryBase> BigConfigDictionary;//yes, this is extremely poor programming.
+    private ConfigEntry<string> CFG_PackSelected;
+    string CurrentSelectedPack;
+    private ExternalPackHandler PackHandler;
+
+
+    private AcceptableValueList<string> AllAudioNames;
     //Hey, note to future me. if things start breaking, switch the reference for nuclear option from the game folder to a local one.
 
     #region Mod Setup
@@ -123,6 +134,10 @@ public class Plugin : BaseUnityPlugin
 
         string Root = Path.GetDirectoryName(Info.Location);
         IsSetupCorrectly = VerifyCriticalFileStructure(Root, Info.Location);
+        //if (IsSetupCorrectly)
+        //{
+        //    VerifyNonCriticalFileStructure(Root);
+        //}
 
 
 
@@ -131,8 +146,11 @@ public class Plugin : BaseUnityPlugin
         //Target Aquired, Advisable to shoot. Not Ideal (more of the thing for MMRs and so on as you want to shoot them at short range but you can, if you choose to, shoot them at long range)
         //Target Aquired, Shooting is advisable. Conditions are nominal.
 
+
+
         Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
 
+        PackHandler = new ExternalPackHandler(Root, gameObject, CFG_Volume_Percent, Audio);
 
         EstablishAudioSetsCFG();
         HasAmmo = true;
@@ -146,16 +164,40 @@ public class Plugin : BaseUnityPlugin
 
         TicksSinceJustifiedExistence = 0;
 
+        Logger.LogInfo("Generating ConfigDictionary");
+        BigConfigDictionary = DefineConfigDictionary();
+
+        EstablishPackHandlingCFG();
+
         Logger.LogInfo($"Plugin {FileModName} is loaded!");
 
+        //WriteConfigsToExternalFile(Root + "\\Audio\\"+ExternalPackHandler.ConfigFileName);
+
+    }
+    private void initialiseAllConfigsOnly()
+    {
+        EstablishAudioCFGArray();
+        EstablishGeneralCFG();
+        EstablishWeaponSpecificCFG();
+
+        EstablishAudioSetsCFG();
+        BigConfigDictionary = DefineConfigDictionary();
+        EstablishPackHandlingCFG();
+
+        LoadAudioClipsIntoMemory(true);
     }
     private void EstablishAudioSetsCFG()
     {
+        
         Logger.LogInfo("Establishing AudioSets Configs");
 
         string[] AudioNames = Audio.CreateArrayOfAudioNames();
-        //AudioNames.Append(":null:");
 
+        foreach (string s in AudioNames)
+        {
+            Logger.LogInfo(s);
+        }
+        //AudioNames.Append(":null:");
         CFG_NoAmmoSwitchEnabled = Config.Bind("Misc", "Play NoAmmo On Weapon Switch", false, "If Enabled, The no Ammo tone will also play when switching to a weapon with no ammo. If disabled, sound will play once when your current weapon runs out of ammo");
         if (AudioNames.Length > 0)
         {
@@ -178,6 +220,7 @@ public class Plugin : BaseUnityPlugin
             CFG_PlayOnceOnStatusChanged[i] = Config.Bind("Set " + i + " Sounds", "5) PlayAudioOnceWhenLockStatusChanged", false, "If Enabled, Selected audio will play once when the status of the lock has changed (e.g. from Shoot to NEZ). If disabled then audio will play continuously. Please note that this is not compatible with pitch scaling for obvious reasons");
         }
 
+
     }
     private void EstablishAudioCFGArray()
     {
@@ -197,8 +240,8 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Establishing General Configs");
         CFG_Volume_Percent = Config.Bind("General", "GeneralVolume", 100, new ConfigDescription("How Loud you want to be told when to shoot", new AcceptableValueRange<int>(0, 200)));
         CFG_Enabled = Config.Bind("General", "ModEnabled", true, "Do you want to enable this mod?");
-        CFG_PlayWhenNoTargetSelect = Config.Bind("General", "PlayWhenNoTargts", false, "Do you want the no lock sound to be played when you have no target selected?");
-        CFG_PlayWhenNoAmmo = Config.Bind("General", "PlayWhenNoTargts", false, "Do you want Sound to be played even if you have no Ammo");
+        CFG_PlayWhenNoTargetSelect = Config.Bind("General", "PlayWhenNoTargets", false, "Do you want the no lock sound to be played when you have no target selected?");
+        CFG_PlayWhenNoAmmo = Config.Bind("General", "PlayWhenNoAmmo", false, "Do you want Sound to be played even if you have no Ammo");
         CFG_PlayWhenGearDown = Config.Bind("General", "PlayWhenGearDown", false, "If Enabled, Lock tones continue to play when your landing gear is extended");
         CFG_prioritizeNEZSound = Config.Bind("General", "PrioritizeNEZ", false, "If ticked, if a missile does not have a NEZ defined, the NEZ sound will play to shoot instead of the shoot sound");
     }
@@ -243,6 +286,17 @@ public class Plugin : BaseUnityPlugin
         //High Power Laser
         CFG_EnableMedusaLaser = Config.Bind("Medusa", "HighPowerLaser_Enabled", true, "If Enabled, Lock Tone Sounds will play when using HighPowerLaser");
         CFG_MedusaLaser_set = Config.Bind("Medusa", "HighPowerLaser_Set", 0, new ConfigDescription("What Audio set do you want to use for HighPowerLaser", new AcceptableValueList<int>(SetNumbers)));
+    }
+
+    private void EstablishPackHandlingCFG()
+    {
+        Logger.LogInfo("Generating Pack Configs");
+        Logger.LogInfo(PackHandler.GetNumberOfLoadedPacks());
+        CFG_PackSelected = Config.Bind("General", "SelectedPack", ExternalPackHandler.DefaultNotated,new ConfigDescription("What External Packs do you want to load?", new AcceptableValueList<string>(PackHandler.GeneratePackNamesArray())));
+        //CurrentSelectedPack = CFG_PackSelected.Value;
+        Logger.LogInfo("2nd Part");
+        UpdateActivePack();
+        
     }
     //private void Update()
     //{
@@ -369,6 +423,7 @@ public class Plugin : BaseUnityPlugin
             {
                 Logger.LogError("Mod Folder Not Found. Generating New one");
                 Directory.CreateDirectory($"{Root}\\{FileModName}\\Audio");
+                Directory.CreateDirectory($"{Root}\\{FileModName}\\Packs");
             }
             Logger.LogInfo("Restart of Nuclear Option is required to ensure the mod works properly");
             try
@@ -394,6 +449,12 @@ public class Plugin : BaseUnityPlugin
                 Directory.CreateDirectory($"{Root}\\Audio");
                 Logger.LogMessage("File Structure has been corrected. Should be functional now.");
             }
+            if (!Directory.Exists($"{Root}\\Packs"))
+            {
+                Logger.LogWarning("External Packs Folder does not exist. Generating replacement");
+                Directory.CreateDirectory($"{Root}\\Packs");
+            }
+
             return true;
         }
         return false;
@@ -402,10 +463,10 @@ public class Plugin : BaseUnityPlugin
     private static void VerifyNonCriticalFileStructure(string Root)
     {
         //to be ran after the critical file structure script
-        if (!Directory.Exists($"{Root}\\{FileModName}\\Packs"))
+        if (!Directory.Exists($"{Root}\\Packs"))
         {
             Logger.LogWarning("External Packs Folder does not exist. Generating replacement");
-            Directory.CreateDirectory($"{Root}\\{FileModName}\\Packs");
+            Directory.CreateDirectory($"{Root}\\Packs");
         }
 
     }
@@ -424,6 +485,7 @@ public class Plugin : BaseUnityPlugin
         {
             StopAudio();
         }
+        UpdateActivePack();
     }
     private void OnActiveSceneChanged(Scene oldScene, Scene newScene)
     {
@@ -701,6 +763,10 @@ public class Plugin : BaseUnityPlugin
         {
             File.Delete(Info.Location);
         }
+        else if(CFG_PackSelected.Value == ExternalPackHandler.DefaultNotated)
+        {
+            WriteConfigsToExternalFile(PackHandler.GetDefaultConfigPath());
+        }
     }
     public void Log(LogLevel LogLevel, object Data)
     {
@@ -708,5 +774,405 @@ public class Plugin : BaseUnityPlugin
     }
     public string GetFileModName() => FileModName;
     #endregion
+    #region ExternalPackHandling
+
+    private Dictionary<string,ConfigEntryBase> DefineConfigDictionary()
+    {
+        Dictionary<string, ConfigEntryBase> ReturnDictionary = new Dictionary<string, ConfigEntryBase>();
+        //string text = "#START#\n";
+        //General
+        //text += "#GENERAL#\n";
+        //Logger.LogInfo("Dictionary. General");
+        AppendDictionary(CFG_PlayWhenNoTargetSelect, ref ReturnDictionary);
+        AppendDictionary(CFG_PlayWhenNoAmmo, ref ReturnDictionary);
+        AppendDictionary(CFG_PlayWhenGearDown, ref ReturnDictionary);
+        AppendDictionary(CFG_prioritizeNEZSound, ref ReturnDictionary);
+
+        //Weapons
+        //Logger.LogInfo("Dictionary. Weapons");
+        //RADAR
+        //Logger.LogInfo("Dictionary. Radar");
+        AppendDictionary(CFG_SARH_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableSARH, ref ReturnDictionary);
+
+        //IR
+        //Logger.LogInfo("Dictionary. IR");
+        AppendDictionary(CFG_IR_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableIR, ref ReturnDictionary);
+
+        //Optical
+        //Logger.LogInfo("Dictionary. Optical");
+        AppendDictionary(CFG_Optical_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableOptical, ref ReturnDictionary);
+
+        //Laser
+        //Logger.LogInfo("Dictionary. Laser");
+        AppendDictionary(CFG_Laser_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableLaser, ref ReturnDictionary);
+
+        //Bomb
+        //Logger.LogInfo("Dictionary. Bomb");
+        AppendDictionary(CFG_Bomb_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableBomb, ref ReturnDictionary);
+
+        //Gun
+        //Logger.LogInfo("Dictionary. Gun");
+        AppendDictionary(CFG_Gun_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableGun, ref ReturnDictionary);
+
+        //Jammer
+        //Logger.LogInfo("Dictionary. Jammer");
+        AppendDictionary(CFG_Jammer_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableJammer, ref ReturnDictionary);
+
+        //MedusaLaser
+        //Logger.LogInfo("Dictionary. MedusaLaser");
+        AppendDictionary(CFG_MedusaLaser_set, ref ReturnDictionary);
+        AppendDictionary(CFG_EnableMedusaLaser, ref ReturnDictionary);
+
+        //Misc
+        //Logger.LogInfo("Dictionary. Misc");
+        AppendDictionary(CFG_NoAmmoSound, ref ReturnDictionary);
+        AppendDictionary(CFG_NoAmmoSwitchEnabled, ref ReturnDictionary);
+        AppendDictionary(CFG_ScalePitchEnd, ref ReturnDictionary);
+
+        //The Sets
+        //Logger.LogInfo("Dictionary. Sets");
+        for (int i = 0; i < AudioClipNumber; i++)
+        {
+            //Logger.LogInfo("Dictionary. "+i);
+            AppendDictionary(CFG_NEZ_Sound[i], ref ReturnDictionary);
+            AppendDictionary(CFG_SHOOT_Sound[i], ref ReturnDictionary);
+            AppendDictionary(CFG_LOCKING_Sound[i], ref ReturnDictionary);
+            AppendDictionary(CFG_UsingPitchDistanceScaling[i], ref ReturnDictionary);
+        }
+
+        return ReturnDictionary;
+    }
+    private void AppendDictionary<T>(ConfigEntry<T> Config, ref Dictionary<string, ConfigEntryBase> Dictionary)
+    {
+        //Logger.LogInfo("Processing" + Config.Definition);
+        //try
+        //{
+            Dictionary.Add(Config.Definition.ToString(), Config);
+        //}
+        //catch(Exception Value)
+        //{
+        //    Logger.LogFatal(Value+"\n"+Config.Definition.ToString());
+            
+        //}
+    }
+
+    private void AppendStringWithRelevantConfig<T>(ConfigEntry<T> Config, ref string ReturnString)
+    {
+        ReturnString += Config.Definition + "#" + Config.Value +"\n";
+    }
+    private void WriteConfigsToExternalFile(string Path)
+    {
+        //string text = "";
+        //foreach(string s in BigConfigDictionary.Keys)
+        //{
+        //    text += s + "#" + BigConfigDictionary[s].BoxedValue  +"\n";
+        //}
+        //File.WriteAllText(Path, text);
+        File.WriteAllLines(Path, GetCurrentConfig());
+    }
+    private string[] GetCurrentConfig()
+    {
+        int index = 0;
+        string[] CFG = new string[BigConfigDictionary.Count];
+        foreach (string s in BigConfigDictionary.Keys)
+        {
+            CFG[index] = s + "#" + BigConfigDictionary[s].BoxedValue;
+            index++;
+        }
+        return CFG;
+    }
+    private void LoadConfigsFromText(string[] Lines)//this doesnt work for the arrays of configs. how odd.
+    {
+        Regex ConfigComb = new Regex(@"^(.+)\#(.+)$");
+        Regex NumberOnlyCheck = new Regex(@"^[\d|\.]+$");
+        foreach(string s in Lines)
+        {
+            if (ConfigComb.Match(s).Success)
+            {
+                string[] data = s.Split('#');
+                //[0] is the config field, [1] is the value;
+                ConfigEntryBase SpecificConfig = BigConfigDictionary[data[0]];
+                //Logger.LogInfo("Processing " + SpecificConfig.Definition);
+                //Logger.LogInfo("OLD:" + SpecificConfig.BoxedValue);
+                if (SpecificConfig.GetType() == typeof(ConfigEntry<bool>))
+                {
+                    SpecificConfig.BoxedValue = data[1] switch
+                    {
+                        "True" => true,
+                        "False" => false,
+                        _ => false
+                    };
+                    //Logger.LogInfo("This is boolean");
+
+                }
+                else if(SpecificConfig.GetType() == typeof(ConfigEntry<string>))
+                {
+                    SpecificConfig.BoxedValue = data[1];
+                    //Logger.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+
+                }
+                else if (SpecificConfig.GetType() == typeof(ConfigEntry<int>))
+                {
+                    if (NumberOnlyCheck.Match(data[1]).Success)
+                    {
+                        SpecificConfig.BoxedValue = System.Convert.ToInt32(data[1]);
+
+                        //Logger.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                    }
+                    else
+                    {
+                        Plugin.I.Log(LogLevel.Error, "Integer expected. value could not be parsed to integer. value: " + data[1]);
+                    }
+                }
+                else if(SpecificConfig.GetType() == typeof(ConfigEntry<float>))
+                {
+                    if (NumberOnlyCheck.Match(data[1]).Success)
+                    {
+                        SpecificConfig.BoxedValue = float.Parse(data[1]);
+
+                        //Logger.LogInfo("replacing " + SpecificConfig.Definition + " with " + data[1]);
+                    }
+                    else
+                    {
+                        Plugin.I.Log(LogLevel.Error, "Float expected. value could not be parsed to Float. value: " + data[1]);
+                    }
+                }
+                else
+                {
+                    Plugin.I.Log(LogLevel.Error,"Unknown config. " + SpecificConfig.GetType());
+                }
+
+                //Logger.LogInfo("NEW:" + SpecificConfig.BoxedValue);
+
+            }
+            
+        }
+    }
+
+
+                    //    try
+                    //{
+                    //    //Haha. big vulnerability go brrr.
+                    //                                        //well ig this does technically paint over the cracks.
+                    //                                        //this mod was never meant to have packs. 
+                    //                                        //if I had intended to implement this feature from the start i would have set out its architecture that way.
+                    //                                        //but alas, i misjudged what the people want. and the people want packs. and so I shall deliver.
+                    //                                        //I hope I dont succumb to the same pit falls as my predessor.
+                    //                                        //should that happen, ill just make the whole thing from the ground up. 
+                    //                                        //This has been my first mod and it has been a wonderful learning experience. 
+
+
+                    //    //I love learning so much.
+                    //}
+                    //catch (Exception Exception)
+                    //{
+
+                    //    Logger.LogFatal("ERROR LOADING CONFIG FILE\n" + Exception);
+                    ////}
+
+private void UpdateActivePack()
+    {
+        if (CurrentSelectedPack != CFG_PackSelected.Value)
+        {
+            PackAudioHandler CurrentAudioPack = PackHandler.GetPackAudioHandlerFromName(CurrentSelectedPack);
+            if (!CurrentAudioPack.IsNull)
+            {
+                Logger.LogInfo("Saving Current PackConfig");
+                WriteConfigsToExternalFile(CurrentAudioPack.GetConfigPath());
+                
+
+            }
+            else
+            {
+                Logger.LogError("Current Pack could not be saved .Pack is not defined. If this is triggered during mod load up, disregard.");
+            }
+            Logger.LogInfo("Loading Pack" + CFG_PackSelected.Value);
+            CurrentAudioPack = PackHandler.GetPackAudioHandlerFromName(CFG_PackSelected.Value);
+            if (!CurrentAudioPack.IsNull)
+            {
+                Logger.LogInfo("Loading " + CFG_PackSelected.Value);
+                try
+                {
+                    CurrentSelectedPack = CFG_PackSelected.Value;//This must go here to stop infitite recursion.
+
+                    StopAudioAndRatchetUpJustification();
+                    Audio = CurrentAudioPack.AudioHandler;
+
+
+                    LoadConfigsFromText(CurrentAudioPack.Configs);
+                    Logger.LogInfo("Pack Loaded");
+
+                    Logger.LogInfo("Reloading Mod (includes clearing config");
+                    //try
+                    //{
+                    //    ReEstablishAudioSetsCFG();//this is meant to reload all acceptable values lists. we shall see if it acc does
+                    //}
+                    //catch(Exception e)
+                    //{
+                    //    Logger.LogFatal(e);
+                    //}
+
+                    //Logger.LogInfo("loading audio into memory");
+                    //LoadAudioClipsIntoMemory(true);
+
+                    Config.Clear();
+                    initialiseAllConfigsOnly();
+
+
+                }
+                catch(Exception EXP)
+                {
+                    Logger.LogFatal(EXP);
+                }
+
+            }
+            else
+            {
+                Logger.LogError("Could not Load Pack. Pack is not defined.");
+            }
+
+            //Logger.LogInfo("Reloading Mod");
+            //EstablishAudioSetsCFG();
+
+            //Logger.LogInfo("loading audio into memory");
+            //LoadAudioClipsIntoMemory(true);
+            //CurrentSelectedPack = CFG_PackSelected.Value;
+        }
+
+    }
+
+    private void ReEstablishAudioSetsCFG()
+    {
+        Logger.LogInfo("Establishing AudioSets Configs");
+
+        string[] AudioNames = Audio.CreateArrayOfAudioNames();
+
+        Logger.LogInfo("audio pack contains");
+        foreach (string s in Audio.CreateArrayOfAudioNames())
+        {
+            Logger.LogInfo(s);
+        }
+        Logger.LogInfo("END OF LIST");
+        //AudioNames.Append(":null:");
+        CFG_NoAmmoSwitchEnabled = Config.Bind("Misc", "Play NoAmmo On Weapon Switch", false, "If Enabled, The no Ammo tone will also play when switching to a weapon with no ammo. If disabled, sound will play once when your current weapon runs out of ammo");
+        if (AudioNames.Length > 0)
+        {
+            CFG_NoAmmoSound = Config.Bind("Misc", "NoAmmo", AudioNames[0], new ConfigDescription("FUCK YOU?", new AcceptableValueList<string>(AudioNames)));
+            //Logger.LogFatal(CFG_NoAmmoSound.Description.Description);
+        }
+        else
+        {
+            CFG_NoAmmoSound = Config.Bind("Misc", "NoAmmo", "", "What Audio Tones do you want to use? (None found Yet)");
+        }
+
+        CFG_ScalePitchEnd = Config.Bind("Misc", "(Distance) PitchScale", 0.5f, new ConfigDescription("How many octives higher (or lower if negetive) do you want the shoot tone to be at minimun range on any sets that have Pitch Scale With Distance Enabled. Note: a value of zero will yield no change in pitch", new AcceptableValueRange<float>(-3f, 3f)));
+
+        Logger.LogInfo("Entering 2nd Half of AudioSets Config");
+        for (int i = 0; i < AudioClipNumber; i++)
+        {
+            SetupAlarmCFG(ref CFG_NEZ_Sound[i], "target in NEZ", "1) NezSound", "Set " + i, AudioNames);
+            SetupAlarmCFG(ref CFG_SHOOT_Sound[i], "it is viable to shoot", "2) ShootSound", "Set " + i, AudioNames);
+            SetupAlarmCFG(ref CFG_LOCKING_Sound[i], "it is not advisable to shoot", "3) LockingSound", "Set " + i, AudioNames);
+            CFG_UsingPitchDistanceScaling[i] = Config.Bind("Set " + i + " Sounds", "4) Enable Distance Pitch Scaling", false, "If Enabled, the NEZ sound will be replaced by the Shoot Sound of variable pitch. The pitch depends on the relevant config in the Misc Section");
+            CFG_PlayOnceOnStatusChanged[i] = Config.Bind("Set " + i + " Sounds", "5) PlayAudioOnceWhenLockStatusChanged", false, "If Enabled, Selected audio will play once when the status of the lock has changed (e.g. from Shoot to NEZ). If disabled then audio will play continuously. Please note that this is not compatible with pitch scaling for obvious reasons");
+        }
+    }
+    private void ChangeAcceptableValuesStringLIST(string[] NewAcceptableValues)
+    {
+        //Remember to update this set.
+        
+    }
+    private void SetAcceptableValues(ConfigEntry<string> CFG, string[] AcceptableValues)
+    {
+        //Assume the defualt is still item zero.
+        if(AcceptableValues.Length <= 0)
+        {
+            CFG.Value = AudioHandler.NoAudio;
+        }
+        else
+        {
+            if (!AcceptableValues.Contains(CFG.Value))
+            {
+                CFG.Value = AcceptableValues[0];
+            }
+            //CFG.Description = new ConfigDescription(CFG.Description.Description, new AcceptableValueList<string>(AcceptableValues));
+        }
+    }
+    #endregion
+
+
+
+    //private void WriteConfigsToExternalFile(string Path)
+    //{
+    //    string text = "#START#\n";
+    //    //General
+    //    text += "#GENERAL#\n";
+
+    //    AppendStringWithRelevantConfig(CFG_PlayWhenNoTargetSelect, ref text);
+    //    AppendStringWithRelevantConfig(CFG_PlayWhenNoAmmo, ref text);
+    //    AppendStringWithRelevantConfig(CFG_PlayWhenGearDown, ref text);
+    //    AppendStringWithRelevantConfig(CFG_prioritizeNEZSound, ref text);
+
+    //    //Weapons
+    //    text += "#WEAPONS#\n";
+
+    //    //RADAR
+    //    AppendStringWithRelevantConfig(CFG_SARH_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableSARH, ref text);
+
+    //    //IR
+    //    AppendStringWithRelevantConfig(CFG_IR_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableIR, ref text);
+
+    //    //Optical
+    //    AppendStringWithRelevantConfig(CFG_Optical_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableOptical, ref text);
+
+    //    //Laser
+    //    AppendStringWithRelevantConfig(CFG_Laser_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableLaser, ref text);
+
+    //    //Bomb
+    //    AppendStringWithRelevantConfig(CFG_Bomb_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableBomb, ref text);
+
+    //    //Gun
+    //    AppendStringWithRelevantConfig(CFG_Gun_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableGun, ref text);
+
+    //    //Jammer
+    //    AppendStringWithRelevantConfig(CFG_Jammer_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableJammer, ref text);
+
+    //    //MedusaLaser
+    //    AppendStringWithRelevantConfig(CFG_MedusaLaser_set, ref text);
+    //    AppendStringWithRelevantConfig(CFG_EnableMedusaLaser, ref text);
+
+    //    //Misc
+    //    text += "#MISC#\n";
+    //    AppendStringWithRelevantConfig(CFG_NoAmmoSound, ref text);
+    //    AppendStringWithRelevantConfig(CFG_NoAmmoSwitchEnabled, ref text);
+    //    AppendStringWithRelevantConfig(CFG_ScalePitchEnd, ref text);
+
+    //    //The Sets
+    //    text += "#SETS#\n";
+    //    for (int i = 0; i < AudioClipNumber; i++)
+    //    {
+    //        text += "#SET " + i + "#\n";
+    //        AppendStringWithRelevantConfig(CFG_NEZ_Sound[i], ref text);
+    //        AppendStringWithRelevantConfig(CFG_SHOOT_Sound[i], ref text);
+    //        AppendStringWithRelevantConfig(CFG_LOCKING_Sound[i], ref text);
+    //    }
+    //    text += "#END#";
+
+    //    File.WriteAllText(Path, text);
+    //}
 }
 
