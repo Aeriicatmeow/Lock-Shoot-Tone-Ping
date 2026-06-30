@@ -147,9 +147,9 @@ namespace Lock_Shoot_Tone_Ping
         {
             Plugin.I.Log(LogLevel.Info, "Generating audio list");
             string[] AudioNames = new string[AllAudio.Length + 1];
-            for(int i = 1; i <= AllAudio.Length; i++)
+            for (int i = 1; i <= AllAudio.Length; i++)
             {
-                AudioNames[i] = AllAudio[i-1].name;
+                AudioNames[i] = AllAudio[i - 1].name;
             }
             Plugin.I.Log(LogLevel.Info, "Appending Audio List");
             AudioNames[0] = NoAudio;
@@ -172,12 +172,12 @@ namespace Lock_Shoot_Tone_Ping
 
         #region Audio Loading
         //technically poor programming ettiquette but ive just come out of an inorganic chemistry exam so i dont care
-        private AudioClip[] LoadAudioFromFolder(string Path)
+        public static AudioClip[] LoadAudioFromFolder(string Path)
         {
             if (!Directory.Exists(Path))
             {
                 Plugin.I.Log(LogLevel.Error, "Audio Directory Not Found");
-                return null;
+                return new AudioClip[0];
             }
 
             string[] AllFoundAudio = SearchAndFilter(Path, @"\.mp3$|\.ogg$|\.wav$");
@@ -192,7 +192,7 @@ namespace Lock_Shoot_Tone_Ping
             }
             return ReturnArray;
         }
-        private string[] SearchAndFilter(string Path, string Regex)//there is definitely a better way of doing this but I couldnt find it
+        public static string[] SearchAndFilter(string Path, string Regex)//there is definitely a better way of doing this but I couldnt find it
         {
             //string RegexFilter = "";
             //foreach(string s in Extensions)
@@ -225,7 +225,7 @@ namespace Lock_Shoot_Tone_Ping
             }
             return ReturnArray;
         }
-        private AudioClip LoadAudioFromFile(string Path)
+        public static AudioClip LoadAudioFromFile(string Path)
         {
             Match RegexMatch = new Regex(@"^.*\\(.*)\.(\w+)$").Match(Path);
             AudioType Type = GetAudioType(RegexMatch);
@@ -288,5 +288,22 @@ namespace Lock_Shoot_Tone_Ping
         //    };
         //}
         #endregion
+
+        public void InjectAudioClips(AudioClip[] InjectedAudio)
+        {
+            AudioClip[] NewAudioSet = new AudioClip[AllAudio.Length + InjectedAudio.Length];
+            int pointer = 0;
+            foreach(AudioClip a in AllAudio)
+            {
+                NewAudioSet[pointer] = a;
+                pointer++;
+            }
+            foreach(AudioClip a in InjectedAudio)
+            {
+                NewAudioSet[pointer] = a;
+                pointer++;
+            }
+            AllAudio = NewAudioSet;
+        }
     }
 }
