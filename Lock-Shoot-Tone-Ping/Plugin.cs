@@ -106,79 +106,84 @@ public class Plugin : BaseUnityPlugin
     private ConfigEntry<bool> CFG_WipeUnusedConfigs;
 
 
-    private AcceptableValueList<string> AllAudioNames;
     //Hey, note to future me. if things start breaking, switch the reference for nuclear option from the game folder to a local one.
 
     #region Mod Setup
     private void Awake()
     {
-
-        I = this;
-        // Plugin startup logic
-        Logger = base.Logger;
-
-        int[] AudioSetLimit = new int[10];
-        for (int i = 0; i < AudioSetLimit.Length; i++)
+        try
         {
-            AudioSetLimit[i] = i + 1;
+            I = this;
+            // Plugin startup logic
+            Logger = base.Logger;
+
+            int[] AudioSetLimit = new int[10];
+            for (int i = 0; i < AudioSetLimit.Length; i++)
+            {
+                AudioSetLimit[i] = i + 1;
+            }
+
+            //CFG_AudioClipNumber = Config.Bind("General", "Number Of Total Audio Sets", 3, new ConfigDescription("You get a maximun of 10 in total. Which should be enough. If you want more, ask me and ill increase the limit as all i need to do is change a number on my end", new AcceptableValueList<int>(AudioSetLimit)));
+            //AudioClipNumber = CFG_AudioClipNumber.Value;
+
+            EstablishAudioCFGArray();
+            EstablishGeneralCFG();
+            EstablishPrePackHandlingCFG();
+            EstablishWeaponSpecificCFG();
+
+            //Locating of the DLL and creation of the audio directory/filestructure.
+
+
+            string Root = Path.GetDirectoryName(Info.Location);
+            IsSetupCorrectly = VerifyCriticalFileStructure(Root, Info.Location);
+
+
+
+            //So what happens is that all audio is loaded into memory. Select tones (selected by the user) are then played at relevant times. those being:
+            //Target Aquired, not free to shoot / Not Advisable
+            //Target Aquired, Advisable to shoot. Not Ideal (more of the thing for MMRs and so on as you want to shoot them at short range but you can, if you choose to, shoot them at long range)
+            //Target Aquired, Shooting is advisable. Conditions are nominal.
+
+            Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
+
+            PackHandler = new ExternalPackHandler(Root, IsSetupCorrectly);
+
+            if (IsSetupCorrectly)
+            {
+                Logger.LogInfo("Injecting Amended Audio List");
+
+                Audio.InjectAudioClips(PackHandler.GenerateArrayAllAudioEver());
+            }
+            else
+            {
+                Logger.LogError("AudioInjection skipped due to file structure error");
+            }
+
+            EstablishAudioSetsCFG();
+            HasAmmo = true;
+
+            Logger.LogInfo("loading audio into memory");
+            LoadAudioClipsIntoMemory(true);
+
+            Logger.LogInfo("Loading Harmony Patches");
+            Inj_Harmony = new Harmony($"com.Aeriicatmeow.{FileModName}");
+            Inj_Harmony.PatchAll();
+
+            TicksSinceJustifiedExistence = 0;
+
+            Logger.LogInfo("Generating ConfigDictionary");
+            BigConfigDictionary = DefineConfigDictionary();
+
+            EstablishPackHandlingCFG();
+
+
+
+            Logger.LogInfo($"Plugin {FileModName} is loaded!");
         }
-
-        //CFG_AudioClipNumber = Config.Bind("General", "Number Of Total Audio Sets", 3, new ConfigDescription("You get a maximun of 10 in total. Which should be enough. If you want more, ask me and ill increase the limit as all i need to do is change a number on my end", new AcceptableValueList<int>(AudioSetLimit)));
-        //AudioClipNumber = CFG_AudioClipNumber.Value;
-
-        EstablishAudioCFGArray();
-        EstablishGeneralCFG();
-        EstablishPrePackHandlingCFG();
-        EstablishWeaponSpecificCFG();
-
-        //Locating of the DLL and creation of the audio directory/filestructure.
-
-
-        string Root = Path.GetDirectoryName(Info.Location);
-        IsSetupCorrectly = VerifyCriticalFileStructure(Root, Info.Location);
-
-
-
-        //So what happens is that all audio is loaded into memory. Select tones (selected by the user) are then played at relevant times. those being:
-        //Target Aquired, not free to shoot / Not Advisable
-        //Target Aquired, Advisable to shoot. Not Ideal (more of the thing for MMRs and so on as you want to shoot them at short range but you can, if you choose to, shoot them at long range)
-        //Target Aquired, Shooting is advisable. Conditions are nominal.
-
-        Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
-
-        PackHandler = new ExternalPackHandler(Root);
-
-        if (IsSetupCorrectly)
+        catch(Exception EXP)
         {
-            Logger.LogInfo("Injecting Amended Audio List");
-
-            Audio.InjectAudioClips(PackHandler.GenerateArrayAllAudioEver());
+            Logger.LogFatal(EXP);
         }
-        else
-        {
-            Logger.LogError("AudioInjection skipped due to file structure error");
-        }
-
-        EstablishAudioSetsCFG();
-        HasAmmo = true;
-
-        Logger.LogInfo("loading audio into memory");
-        LoadAudioClipsIntoMemory(true);
-
-        Logger.LogInfo("Loading Harmony Patches");
-        Inj_Harmony = new Harmony($"com.Aeriicatmeow.{FileModName}");
-        Inj_Harmony.PatchAll();
-
-        TicksSinceJustifiedExistence = 0;
-
-        Logger.LogInfo("Generating ConfigDictionary");
-        BigConfigDictionary = DefineConfigDictionary();
-
-        EstablishPackHandlingCFG();
-        
-
-
-        Logger.LogInfo($"Plugin {FileModName} is loaded!");
 
     }
     private void EstablishAudioSetsCFG()
@@ -229,8 +234,8 @@ public class Plugin : BaseUnityPlugin
         Logger.LogInfo("Establishing General Configs");
         CFG_Volume_Percent = Config.Bind("General", "GeneralVolume", 100, new ConfigDescription("How Loud you want to be told when to shoot", new AcceptableValueRange<int>(0, 200)));
         CFG_Enabled = Config.Bind("General", "ModEnabled", true, "Do you want to enable this mod?");
-        CFG_PlayWhenNoTargetSelect = Config.Bind("General", "PlayWhenNoTargts", false, "Do you want the no lock sound to be played when you have no target selected?");
-        CFG_PlayWhenNoAmmo = Config.Bind("General", "PlayWhenNoTargts", false, "Do you want Sound to be played even if you have no Ammo");
+        CFG_PlayWhenNoTargetSelect = Config.Bind("General", "PlayWhenNoTargets", false, "Do you want the no lock sound to be played when you have no target selected?");
+        CFG_PlayWhenNoAmmo = Config.Bind("General", "PlayWhenNoAmmo", false, "Do you want Sound to be played even if you have no Ammo");
         CFG_PlayWhenGearDown = Config.Bind("General", "PlayWhenGearDown", false, "If Enabled, Lock tones continue to play when your landing gear is extended");
         CFG_prioritizeNEZSound = Config.Bind("General", "PrioritizeNEZ", false, "If ticked, if a missile does not have a NEZ defined, the NEZ sound will play to shoot instead of the shoot sound");
     }
@@ -471,6 +476,7 @@ public class Plugin : BaseUnityPlugin
         {
             StopAudio();
         }
+        UpdateActivePack();
     }
     private void OnActiveSceneChanged(Scene oldScene, Scene newScene)
     {
@@ -850,7 +856,7 @@ public class Plugin : BaseUnityPlugin
     }
     private void AppendDictionary<T>(ConfigEntry<T> Config, ref Dictionary<string, ConfigEntryBase> Dictionary)
     {
-        //Logger.LogInfo("Processing" + Config.Definition);
+        Logger.LogInfo("Processing" + Config.Definition);
         //try
         //{
             Dictionary.Add(Config.Definition.ToString(), Config);
@@ -889,11 +895,23 @@ public class Plugin : BaseUnityPlugin
     }
     private string[] GetCurrentConfig()
     {
+        Regex RevertPrefix = new Regex(@"^\[.+\] (.+)");
         int index = 0;
         string[] CFG = new string[BigConfigDictionary.Count];
         foreach (string s in BigConfigDictionary.Keys)
         {
-            CFG[index] = s + PackDataSplitChar + BigConfigDictionary[s].BoxedValue;
+            object CurrentValue = BigConfigDictionary[s].BoxedValue;
+            if (CurrentValue.GetType() == typeof(string)) 
+            {
+                Match m = RevertPrefix.Match((string)CurrentValue);
+                if (m.Success & CFG_PackSelected.Value != ExternalPackHandler.DefaultNotated)
+                {
+                    CurrentValue = m.Groups[1].Value;
+                }
+            }
+
+            CFG[index] = s + PackDataSplitChar + CurrentValue;
+
             index++;
         }
         return CFG;
@@ -916,7 +934,7 @@ public class Plugin : BaseUnityPlugin
         }
         else
         {
-            Logger.LogInfo("Refusing to wipe existing configs. Config to be loaded is empty");
+            Logger.LogInfo("Refusing to wipe existing configs. (in line with configs)");
         }
 
         Regex ConfigComb = new Regex(@"^(.+)\"+ PackDataSplitChar +"(.+)$");
@@ -1051,7 +1069,6 @@ private void UpdateActivePack(bool AlwaysWriteToDefault  = false )
     {
         if (CurrentSelectedPack != CFG_PackSelected.Value)
         {
-            bool Volatile = false;
             PackAudioHandler CurrentAudioPack = PackHandler.GetPackAudioHandlerFromName(CurrentSelectedPack);
             if (!CurrentAudioPack.IsNull)
             {
@@ -1069,7 +1086,6 @@ private void UpdateActivePack(bool AlwaysWriteToDefault  = false )
                 //    Logger.LogInfo("In order to preserve current configs, searching for config again");
                 //    WriteConfigsToExternalFile(PackHandler.GetPackAudioHandlerFromName(CFG_PackSelected.Value).GetConfigPath());
                 //}
-                Volatile = true;
             }
             Logger.LogInfo("Loading Pack" + CFG_PackSelected.Value);
             CurrentAudioPack = PackHandler.GetPackAudioHandlerFromName(CFG_PackSelected.Value);

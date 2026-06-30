@@ -242,24 +242,32 @@ namespace Lock_Shoot_Tone_Ping
                 //But it works for Yappinator so it should work for this.
                 //Thx Nikkorap btw
 
-                Plugin.I.Log(LogLevel.Info, "Requesting Audio From Directory " + Path);
-                Loader.SendWebRequest();
-                while (!Loader.isDone) { }
-
-                if (Loader.error != null)
+                try
                 {
-                    Plugin.I.Log(LogLevel.Error, "Error Requesting Audio From Directory Using UnityWebRequestMultimMedia\n Error: " + Loader.error);
+                    Plugin.I.Log(LogLevel.Info, "Requesting Audio From Directory " + Path);
+                    Loader.SendWebRequest();
+                    while (!Loader.isDone) { }
+
+                    if (Loader.error != null)
+                    {
+                        Plugin.I.Log(LogLevel.Error, "Error Requesting Audio From Directory Using UnityWebRequestMultimMedia\n Error: " + Loader.error);
+                        return null;
+                    }
+                    AudioClip Audio = DownloadHandlerAudioClip.GetContent(Loader);
+                    if (Audio && Audio.loadState == AudioDataLoadState.Loaded)
+                    {
+                        Audio.name = RegexMatch.Groups[1].Value;
+                        return Audio;
+                    }
+
+                    Plugin.I.Log(LogLevel.Error, "Undefinied Error Loading Audio from " + Path);
                     return null;
                 }
-                AudioClip Audio = DownloadHandlerAudioClip.GetContent(Loader);
-                if (Audio && Audio.loadState == AudioDataLoadState.Loaded)
+                catch (Exception EXP)
                 {
-                    Audio.name = RegexMatch.Groups[1].Value;
-                    return Audio;
+                    Plugin.I.Log(LogLevel.Fatal, "Fatal error loading audio: " + EXP);
+                    return null;
                 }
-
-                Plugin.I.Log(LogLevel.Error, "Undefinied Error Loading Audio from "+Path);
-                return null;
             }
         }
         private static AudioType GetAudioType(Match RegexMatch)

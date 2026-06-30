@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.Assertions.Must;
 using BepInEx.Logging;
+using UnityEngine.Playables;
 
 namespace Lock_Shoot_Tone_Ping
 {
@@ -16,17 +17,25 @@ namespace Lock_Shoot_Tone_Ping
         private string DefaultPath;
 
         private List<PackAudioHandler> AudioHandlersForDifferentPacks;
-        public ExternalPackHandler(string Root)
+        public ExternalPackHandler(string Root, bool IsSetupCorrectly)
         {
             string FileModName = Plugin.I.GetFileModName();
             string PRoot = $"{Root}\\Packs";
             if (!Directory.Exists(PRoot))
             {
-                Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement cannot therefore be generated");
-                return;
+                if (IsSetupCorrectly)
+                {
+                    Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement being generated");
+                    Directory.CreateDirectory(PRoot);
+                }
+                else
+                {
+                    Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement cannot being generated because it is estimated that this script is being executed on the wrong file structure");
+                    return;
+                }
             }
 
-
+            AudioHandlersForDifferentPacks = new List<PackAudioHandler>();
 
 
             
@@ -49,12 +58,11 @@ namespace Lock_Shoot_Tone_Ping
                     AudioHandlersForDifferentPacks.Add(new PackAudioHandler(Path));
                 }
             }
-
             DefaultPath = Root + "\\Audio";
 
             //Plugin.Logger.LogInfo(DefaultConfigPath);
             Plugin.I.Log(LogLevel.Info, "Injecting Default Pack into Handler");
-            AudioHandlersForDifferentPacks.Insert(0,PackAudioHandler.GenerateDefaultStandin(this));
+            AudioHandlersForDifferentPacks.Insert(0, PackAudioHandler.GenerateDefaultStandin(this));
 
             Plugin.I.Log(LogLevel.Info, "External Pack Handler Generated");
         }
@@ -133,7 +141,6 @@ namespace Lock_Shoot_Tone_Ping
         public string[] Configs;
         public string Path;
         public bool IsNull;
-        public bool IsDefault;
 
         private static Regex LastInPath = new Regex(@"^.*[\\]([^\\]*$)");
         public PackAudioHandler(AudioClip[] Audio, string PackName, string[] PackConfigs, string Path)
@@ -149,8 +156,11 @@ namespace Lock_Shoot_Tone_Ping
             this.Path = Path;
             if (File.Exists(GetConfigPath()))
             {
+                Plugin.I.Log(LogLevel.Info, "fetching Audio");
                 Audio = AudioHandler.LoadAudioFromFolder(Path);
+                Plugin.I.Log(LogLevel.Info, "fetching Config");
                 Configs = File.ReadAllLines(GetConfigPath());
+                Plugin.I.Log(LogLevel.Info, "Defining commonly used variables");
                 Name = LastInPath.Match(Path).Groups[1].Value;
                 IsNull = false;
 
@@ -158,6 +168,7 @@ namespace Lock_Shoot_Tone_Ping
                 {
                     a.name = Prefix(a.name);
                 }
+                Plugin.I.Log(LogLevel.Info, Name + " Is fetched!");
             }
             else
             {
@@ -227,7 +238,7 @@ namespace Lock_Shoot_Tone_Ping
                 StreamLinedCategory tmp = StreamLinedCategory.SearchByName(dat[0], Categories);
                 if (tmp == null)
                 {
-                    Plugin.I.Log(LogLevel.Info, "Category Doesnt Already Exist, Creating New");
+                    //Plugin.I.Log(LogLevel.Info, "Category Doesnt Already Exist, Creating New");
                     tmp = new StreamLinedCategory(dat[0]);
                     Categories.Add(tmp);
                     Count+=2;
@@ -420,7 +431,7 @@ namespace Lock_Shoot_Tone_Ping
                         return s;
                     }
                 }
-                Plugin.I.Log(LogLevel.Error, "Category Not Found " + Name);
+                //Plugin.I.Log(LogLevel.Error, "Category Not Found " + Name);
                 return null;
             }
 
