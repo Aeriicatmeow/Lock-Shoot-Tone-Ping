@@ -904,7 +904,7 @@ public class Plugin : BaseUnityPlugin
             if (CurrentValue.GetType() == typeof(string)) 
             {
                 Match m = RevertPrefix.Match((string)CurrentValue);
-                if (m.Success & CFG_PackSelected.Value != ExternalPackHandler.DefaultNotated)
+                if (m.Success & CurrentSelectedPack != ExternalPackHandler.DefaultNotated)
                 {
                     CurrentValue = m.Groups[1].Value;
                 }
