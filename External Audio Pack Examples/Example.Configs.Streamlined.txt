@@ -1,0 +1,101 @@
+
+[General]
+PlayWhenNoTargets=False
+PlayWhenNoAmmo=False
+PlayWhenGearDown=False
+PrioritizeNEZ=False
+
+[SARH/ARM/ARAD]
+Radar_Set=0
+Radar_Enabled=True
+
+[IR]
+IR_Set=0
+IR_Enabled=True
+
+[Optical]
+Optical_Set=2
+Optical_Enabled=True
+
+[Laser]
+Laser_Set=1
+Laser_Enabled=True
+
+[Gravity Bombs]
+Bombs_Set=1
+Bombs_Enabled=True
+
+[Guns]
+Guns_Set=4
+Guns_Enabled=True
+
+[Medusa]
+JammerPods_Set=5
+JammerPods_Enabled=True
+HighPowerLaser_Set=4
+HighPowerLaser_Enabled=True
+
+[Misc]
+NoAmmo=empty
+Play NoAmmo On Weapon Switch=True
+(Distance) PitchScale=1
+
+[Set 0 Sounds]
+1) NezSound=Aim9Highhigh
+2) ShootSound=Aim9High
+3) LockingSound=Aim9Low
+4) Enable Distance Pitch Scaling=True
+
+[Set 1 Sounds]
+1) NezSound=AC 4 missile locked
+2) ShootSound=AC 4 missile locked
+3) LockingSound=AC 4 missile locking
+4) Enable Distance Pitch Scaling=False
+
+[Set 2 Sounds]
+1) NezSound=AC 4 missile locking
+2) ShootSound=AC 4 missile locked
+3) LockingSound=AC 4 missile locking
+4) Enable Distance Pitch Scaling=True
+
+[Set 3 Sounds]
+1) NezSound=:[NONE]:
+2) ShootSound=:[NONE]:
+3) LockingSound=:[NONE]:
+4) Enable Distance Pitch Scaling=False
+
+[Set 4 Sounds]
+1) NezSound=AC 4 missile locked
+2) ShootSound=AC 4 missile locked
+3) LockingSound=:[NONE]:
+4) Enable Distance Pitch Scaling=True
+
+[Set 5 Sounds]
+1) NezSound=Jammer_loop
+2) ShootSound=:[NONE]:
+3) LockingSound=:[NONE]:
+4) Enable Distance Pitch Scaling=False
+
+[Set 6 Sounds]
+1) NezSound=:[NONE]:
+2) ShootSound=:[NONE]:
+3) LockingSound=:[NONE]:
+4) Enable Distance Pitch Scaling=False
+
+[Set 7 Sounds]
+1) NezSound=:[NONE]:
+2) ShootSound=:[NONE]:
+3) LockingSound=:[NONE]:
+4) Enable Distance Pitch Scaling=False
+
+[Set 8 Sounds]
+1) NezSound=Aim9Low
+2) ShootSound=Aim9Low
+3) LockingSound=Aim9Low
+4) Enable Distance Pitch Scaling=False
+
+[Set 9 Sounds]
+1) NezSound=:[NONE]:
+2) ShootSound=:[NONE]:
+3) LockingSound=:[NONE]:
+4) Enable Distance Pitch Scaling=False
