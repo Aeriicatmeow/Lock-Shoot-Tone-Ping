@@ -125,7 +125,7 @@ namespace Lock_Shoot_Tone_Ping
                 {
                     foreach (AudioClip a in PAH.Audio)
                     {
-                        Plugin.I.Log(LogLevel.Info, totalCount);
+                        //Plugin.I.Log(LogLevel.Info, totalCount);
                         ReturnArray[totalCount] = a;
                         totalCount++;
                     }

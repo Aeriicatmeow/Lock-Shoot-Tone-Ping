@@ -18,7 +18,7 @@ using UnityEngine.SceneManagement;
 namespace Lock_Shoot_Tone_Ping;
 
 
-[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.2.0")]
+[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.2.1")]
 public class Plugin : BaseUnityPlugin
 {
     public static Plugin I { get; private set; }
@@ -179,6 +179,7 @@ public class Plugin : BaseUnityPlugin
 
 
             Logger.LogInfo($"Plugin {FileModName} is loaded!");
+            Logger.LogInfo("If you run into any issues, please raise an issue request on the github: https://github.com/Aeriicatmeow/Lock-Shoot-Tone-Ping. \nAlternately, please contact me on Dicord. \n Nuclear Option Official Discord Channel: https://discord.com/channels/909034158205059082/1457927084587483260/threads/1511501400545431552 \n Primerva 2082 Channel: https://discord.com/channels/1303878245942431765/1397310405008687208/threads/1512641996643106947 \n Thankyou in advance.");
         }
         catch(Exception EXP)
         {
@@ -285,7 +286,7 @@ public class Plugin : BaseUnityPlugin
     private void EstablishPackHandlingCFG()
     {
         Logger.LogInfo("Generating Pack Configs");
-        Logger.LogInfo(PackHandler.GetNumberOfLoadedPacks());
+        Logger.LogInfo(PackHandler.GetNumberOfLoadedPacks() + " packs found");
 
         string[] AllPacksArray = PackHandler.GeneratePackNamesArray();
         if (AllPacksArray.Length > 0)

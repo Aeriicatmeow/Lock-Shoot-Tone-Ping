@@ -121,7 +121,7 @@ namespace Lock_Shoot_Tone_Ping
                     {
                         Stop();
                     }
-                    Plugin.I.Log(LogLevel.Info, "Playing Null");
+                    //Plugin.I.Log(LogLevel.Info, "Playing Null");
                     //Plugin.I.Log(LogLevel.Error, "Could Not Play, Audio Null");
                 }
             }
