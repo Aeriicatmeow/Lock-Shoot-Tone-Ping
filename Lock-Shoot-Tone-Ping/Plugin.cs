@@ -18,13 +18,14 @@ using UnityEngine.SceneManagement;
 namespace Lock_Shoot_Tone_Ping;
 
 
-[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.2.1")]
+[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.2.2")]
 public class Plugin : BaseUnityPlugin
 {
     public static Plugin I { get; private set; }
     internal static new ManualLogSource Logger;
 
-    private const string FileModName = "LockShootTonePing";
+    private const string FileModName = "LockToneShootPing";
+    private const string OldFileModName = "LockShootTonePing";
     private bool IsSetupCorrectly = false;
 
     private int TicksSinceJustifiedExistence = 0;
@@ -135,7 +136,7 @@ public class Plugin : BaseUnityPlugin
 
 
             string Root = Path.GetDirectoryName(Info.Location);
-            IsSetupCorrectly = VerifyCriticalFileStructure(Root, Info.Location);
+            IsSetupCorrectly = VerifyCriticalFileStructure(ref Root, Info.Location);
 
 
 
@@ -406,12 +407,26 @@ public class Plugin : BaseUnityPlugin
     }
     #endregion
     #region FileHandling
-    private static bool VerifyCriticalFileStructure(string Root, string CurrentDLLPath)
+    private static bool VerifyCriticalFileStructure(ref string Root, string CurrentDLLPath)
     {
-        Regex LastInPath = new Regex(@"^.*[\\]([^\\]*$)");
+        Regex LastInPath = new Regex(@"^(.*[\\])([^\\]*$)");
 
+        if(LastInPath.Match(Root).Groups[2].Value == OldFileModName)
+        {
+            Logger.LogError("OldFileModName detected. Moving contents to new directory");
+            try
+            {
+                string tmp = $"{LastInPath.Match(Root).Groups[1].Value}{FileModName}";
+                Directory.Move(Root, tmp);
+                Root = tmp;
+            }
+            catch (Exception EXP)
+            {
+                Logger.LogFatal(EXP);
+            }
+        }
 
-        if (LastInPath.Match(Root).Groups[1].Value != FileModName)
+        if (LastInPath.Match(Root).Groups[2].Value != FileModName)
         {
             Logger.LogError($"Correct file structure missing. Specifically the {FileModName} Mod Folder.");
             if (Directory.Exists($"{Root}\\{FileModName}"))
@@ -433,6 +448,9 @@ public class Plugin : BaseUnityPlugin
             {
                 Logger.LogError("Could not copy dll");
             }
+
+            Logger.LogInfo("Sorting ExternalPackHandling File Structure");
+            VerifyNonCriticalFileStructure(Root + "\\" + FileModName);
         }
         else
         {
@@ -447,6 +465,7 @@ public class Plugin : BaseUnityPlugin
                 Directory.CreateDirectory($"{Root}\\Audio");
                 Logger.LogMessage("File Structure has been corrected. Should be functional now.");
             }
+            VerifyNonCriticalFileStructure(Root);
             return true;
         }
         return false;
@@ -455,10 +474,10 @@ public class Plugin : BaseUnityPlugin
     private static void VerifyNonCriticalFileStructure(string Root)
     {
         //to be ran after the critical file structure script
-        if (!Directory.Exists($"{Root}\\{FileModName}\\Packs"))
+        if (!Directory.Exists($"{Root}\\Packs"))
         {
             Logger.LogWarning("External Packs Folder does not exist. Generating replacement");
-            Directory.CreateDirectory($"{Root}\\{FileModName}\\Packs");
+            Directory.CreateDirectory($"{Root}\\Packs");
         }
 
     }
@@ -524,9 +543,12 @@ public class Plugin : BaseUnityPlugin
                 {
 
                     if (ResolveIfNEZSound(NEZ, TargetDistance))
-                    {
+                    { 
                         if (CFG_UsingPitchDistanceScaling[SetToPlayFrom].Value)
                         {
+                            //Logger.LogInfo("Playing SCALING");
+                            //Logger.LogInfo("DISTANCE: " + TargetDistance + " NEZ:" + NEZ + " MinRANGE:" + MinRange);
+                            //Logger.LogInfo(ResolveAudioPitchFromDistance(TargetDistance, NEZ, MinRange));
                             //Audio.ResetPitch();
                             //Audio.SetPitch(ResolveAudioPitchFromDistance(TargetDistance, NEZ, MinRange));
                             InternalRequestToPlayLockStateAudio(Aud_SHOOT[SetToPlayFrom], 'N', SetToPlayFrom, WeaponStation, TargetNumber,ResolveAudioPitchFromDistance(TargetDistance, NEZ, MinRange));

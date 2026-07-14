@@ -43,10 +43,12 @@ namespace Lock_Shoot_Tone_Ping
         public void SetPitch(float Pitch)
         {
             Source.pitch = Pitch;
+            //Plugin.I.Log(LogLevel.Info, "Request recieved to set pitch: " + Pitch);
         }
         public void ResetPitch()
         {
             Source.pitch = 1;
+            //Plugin.I.Log(LogLevel.Info, "Request recieved to reset pitch");
         }
         public void AmendNoExceptionClause(bool NewValue)
         {
