@@ -18,7 +18,7 @@ using UnityEngine.SceneManagement;
 namespace Lock_Shoot_Tone_Ping;
 
 
-[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.2.2")]
+[BepInPlugin("com.Aeriicatmeow.LockToneShootPing", " Lock Shoot Tone Ping", "1.2.3")]
 public class Plugin : BaseUnityPlugin
 {
     public static Plugin I { get; private set; }
@@ -114,9 +114,12 @@ public class Plugin : BaseUnityPlugin
     {
         try
         {
+
             I = this;
             // Plugin startup logic
             Logger = base.Logger;
+
+            Logger.LogInfo("Please note, this version is intended for Nuclear Option 0.34");
 
             int[] AudioSetLimit = new int[10];
             for (int i = 0; i < AudioSetLimit.Length; i++)

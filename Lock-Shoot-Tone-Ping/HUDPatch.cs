@@ -5,6 +5,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.UI;
+using NuclearOption.UIStyleSystem;
 namespace Lock_Shoot_Tone_Ping
 {
     [HarmonyPatch(typeof(HUDMissileState), nameof(HUDMissileState.UpdateWeaponDisplay))]
@@ -46,7 +47,7 @@ namespace Lock_Shoot_Tone_Ping
         static void Postfix(WeaponStation ___weaponStation, UnityEngine.UI.Image ___boresight, Aircraft aircraft, List<Unit> targetList)
         {
             //Plugin.I.Log(BepInEx.Logging.LogLevel.Message, "Fired Through Gun HUD");
-            Plugin.I.ResolveLockAudio(___boresight.color == UnityEngine.Color.green, 0, 0, 0, targetList.Count, ___weaponStation.Ammo > 0, aircraft.gearDeployed,___weaponStation, true);
+            Plugin.I.ResolveLockAudio(___boresight.color == ThemeManager.Active.ColorTheme.AllClear, 0, 0, 0, targetList.Count, ___weaponStation.Ammo > 0, aircraft.gearDeployed,___weaponStation, true);
         }
     }
 
