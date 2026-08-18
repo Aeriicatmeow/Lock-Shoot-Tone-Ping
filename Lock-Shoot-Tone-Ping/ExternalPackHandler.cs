@@ -15,27 +15,32 @@ namespace Lock_Shoot_Tone_Ping
         public const string ConfigFileName = "Configs.txt";
         public const string DefaultNotated = ":[Default]:";
         private string DefaultPath;
+        private string PathRoot;
 
         private List<PackAudioHandler> AudioHandlersForDifferentPacks;
-        public ExternalPackHandler(string Root, bool IsSetupCorrectly)
+
+        private bool SetupCorrectly;
+        public ExternalPackHandler(string Root, ref bool IsSetupCorrectly)
         {
+            SetupCorrectly = IsSetupCorrectly;
             string FileModName = Plugin.I.GetFileModName();
-            string PRoot = $"{Root}\\Packs";
-            if (!Directory.Exists(PRoot))
+
+            if (!IsSetupCorrectly)
             {
-                if (IsSetupCorrectly)
-                {
-                    Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement being generated");
-                    Directory.CreateDirectory(PRoot);
-                }
-                else
-                {
-                    Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement cannot being generated because it is estimated that this script is being executed on the wrong file structure");
-                    return;
-                }
+                Root += "\\"+ Plugin.FileModName;
             }
 
+            string PRoot = $"{Root}\\Packs";
+            PathRoot = PRoot;
             AudioHandlersForDifferentPacks = new List<PackAudioHandler>();
+
+            if (!Directory.Exists(PRoot))
+            {
+                Plugin.I.Log(BepInEx.Logging.LogLevel.Error, "External packs Folder Not Found [In External Pack Handler]. Replacement being generated");
+                Directory.CreateDirectory(PRoot);
+            }
+
+
 
 
             
@@ -69,9 +74,16 @@ namespace Lock_Shoot_Tone_Ping
        
         public string GetDefaultConfigPath() => DefaultPath+ "\\" + ConfigFileName;
         public string GetDefaultPath() => DefaultPath;
+        public string GetDefaultPackPath() => PathRoot;
         public string[] GeneratePackNamesArray()
         {
-            
+
+            if (!SetupCorrectly)
+            {
+                string[] returnarray = { AudioHandler.NoAudio };
+                return returnarray;
+            }
+
             string[] Names = new string[AudioHandlersForDifferentPacks.Count];
             for(int i = 0; i < Names.Length; i++)
             {

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using BepInEx;
@@ -24,7 +25,7 @@ public class Plugin : BaseUnityPlugin
     public static Plugin I { get; private set; }
     internal static new ManualLogSource Logger;
 
-    private const string FileModName = "LockToneShootPing";
+    public const string FileModName = "LockToneShootPing";
     private const string OldFileModName = "LockShootTonePing";
     private bool IsSetupCorrectly = false;
 
@@ -106,7 +107,6 @@ public class Plugin : BaseUnityPlugin
     private ConfigEntry<string> CFG_PackConfigEcodingType;
     private ConfigEntry<bool> CFG_WipeUnusedConfigs;
 
-
     //Hey, note to future me. if things start breaking, switch the reference for nuclear option from the game folder to a local one.
 
     #region Mod Setup
@@ -137,7 +137,6 @@ public class Plugin : BaseUnityPlugin
 
             //Locating of the DLL and creation of the audio directory/filestructure.
 
-
             string Root = Path.GetDirectoryName(Info.Location);
             IsSetupCorrectly = VerifyCriticalFileStructure(ref Root, Info.Location);
 
@@ -150,17 +149,18 @@ public class Plugin : BaseUnityPlugin
 
             Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
 
-            PackHandler = new ExternalPackHandler(Root, IsSetupCorrectly);
+            PackHandler = new ExternalPackHandler(Root, ref IsSetupCorrectly);
 
-            if (IsSetupCorrectly)
+            try
             {
                 Logger.LogInfo("Injecting Amended Audio List");
 
                 Audio.InjectAudioClips(PackHandler.GenerateArrayAllAudioEver());
             }
-            else
+            catch(Exception EXP)
             {
-                Logger.LogError("AudioInjection skipped due to file structure error");
+                Logger.LogFatal("Injection failed");
+                Logger.LogFatal(EXP);
             }
 
             EstablishAudioSetsCFG();
@@ -179,7 +179,6 @@ public class Plugin : BaseUnityPlugin
             BigConfigDictionary = DefineConfigDictionary();
 
             EstablishPackHandlingCFG();
-
 
 
             Logger.LogInfo($"Plugin {FileModName} is loaded!");
@@ -324,6 +323,24 @@ public class Plugin : BaseUnityPlugin
             M_Config = Config.Bind(category + " Sounds", Key, "", "What Audio Tones do you want to use? (None found Yet)");
         }
     }
+    private void DownloadExampleAudio(string GenPackPath)
+    {
+
+        Logger.LogInfo("Downloading Aeriicat's Audio Pack");
+        try
+        {
+            WebClient Client = new WebClient();
+            string packPath = GenPackPath + "\\AeriicatsAudioPack";
+            Client.DownloadFile(new System.Uri(@"https://github.com/Aeriicatmeow/Lock-Shoot-Tone-Ping/releases/download/v1.2.0/Aeriicats.Audio.Pack.zip"), packPath + ".zip");
+            System.IO.Compression.ZipFile.ExtractToDirectory(packPath + ".zip", GenPackPath);
+            File.Delete(packPath + ".zip");
+        }
+        catch(Exception EXP)
+        {
+            Logger.LogFatal(EXP);
+        }
+        
+    }
     #region AudioHandlingInThisScript
     private void LoadAudioClipsIntoMemory(bool OnStartUp = false)
     {
@@ -410,7 +427,7 @@ public class Plugin : BaseUnityPlugin
     }
     #endregion
     #region FileHandling
-    private static bool VerifyCriticalFileStructure(ref string Root, string CurrentDLLPath)
+    private bool VerifyCriticalFileStructure(ref string Root, string CurrentDLLPath)
     {
         Regex LastInPath = new Regex(@"^(.*[\\])([^\\]*$)");
 
@@ -474,13 +491,15 @@ public class Plugin : BaseUnityPlugin
         return false;
     }
 
-    private static void VerifyNonCriticalFileStructure(string Root)
+    private void VerifyNonCriticalFileStructure(string Root)
     {
         //to be ran after the critical file structure script
-        if (!Directory.Exists($"{Root}\\Packs"))
+        string Path = $"{Root}\\Packs";
+        if (!Directory.Exists(Path))
         {
             Logger.LogWarning("External Packs Folder does not exist. Generating replacement");
-            Directory.CreateDirectory($"{Root}\\Packs");
+            Directory.CreateDirectory(Path);
+            DownloadExampleAudio(Path);
         }
 
     }
