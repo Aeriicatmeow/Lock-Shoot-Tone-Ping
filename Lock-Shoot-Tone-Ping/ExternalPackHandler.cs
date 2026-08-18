@@ -19,10 +19,8 @@ namespace Lock_Shoot_Tone_Ping
 
         private List<PackAudioHandler> AudioHandlersForDifferentPacks;
 
-        private bool SetupCorrectly;
         public ExternalPackHandler(string Root, ref bool IsSetupCorrectly)
         {
-            SetupCorrectly = IsSetupCorrectly;
             string FileModName = Plugin.I.GetFileModName();
 
             if (!IsSetupCorrectly)
@@ -78,11 +76,11 @@ namespace Lock_Shoot_Tone_Ping
         public string[] GeneratePackNamesArray()
         {
 
-            if (!SetupCorrectly)
-            {
-                string[] returnarray = { AudioHandler.NoAudio };
-                return returnarray;
-            }
+            //if (!SetupCorrectly)
+            //{
+            //    string[] returnarray = { AudioHandler.NoAudio };
+            //    return returnarray;
+            //}
 
             string[] Names = new string[AudioHandlersForDifferentPacks.Count];
             for(int i = 0; i < Names.Length; i++)

@@ -147,10 +147,10 @@ public class Plugin : BaseUnityPlugin
             //Target Aquired, Advisable to shoot. Not Ideal (more of the thing for MMRs and so on as you want to shoot them at short range but you can, if you choose to, shoot them at long range)
             //Target Aquired, Shooting is advisable. Conditions are nominal.
 
-            Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
+
 
             PackHandler = new ExternalPackHandler(Root, ref IsSetupCorrectly);
-
+            Audio = new AudioHandler(gameObject, CFG_Volume_Percent, Root + "\\Audio");
             try
             {
                 Logger.LogInfo("Injecting Amended Audio List");
